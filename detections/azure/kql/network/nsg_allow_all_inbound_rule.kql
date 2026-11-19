@@ -1,0 +1,32 @@
+// Title: Network Security Group Inbound Rule Exposing Critical Ports to Internet
+// Description: Identifies creation or modification of Azure NSG security rules permitting ingress traffic from ANY (0.0.0.0/0 or *) to management ports (22, 3389, 445).
+// Author: Pulkit Rai
+// MITRE ATT&CK: T1190 (Exploit Public-Facing Application), T1046 (Network Service Discovery)
+// Data Sources: AzureActivity
+// Severity: High
+
+AzureActivity
+| where TimeGenerated >= ago(24h)
+| where OperationNameValue =~ "MICROSOFT.NETWORK/NETWORKSECURITYGROUPS/SECURITYRULES/WRITE"
+| where ActivityStatusValue =~ "Success"
+| extend PropertiesBag = parse_json(Properties)
+| extend RequestBody = parse_json(tostring(PropertiesBag.requestbody))
+| extend RuleAccess = tostring(RequestBody.properties.access)
+| extend RuleDirection = tostring(RequestBody.properties.direction)
+| extend SourcePrefix = tostring(RequestBody.properties.sourceAddressPrefix)
+| extend DestPortRange = tostring(RequestBody.properties.destinationPortRange)
+| where RuleAccess =~ "Allow" and RuleDirection =~ "Inbound"
+| where SourcePrefix in ("*", "0.0.0.0/0", "Internet")
+| where DestPortRange in ("*", "22", "3389", "445", "1433", "3306") or DestPortRange has "22" or DestPortRange has "3389"
+| project 
+    TimeGenerated,
+    SubscriptionId,
+    ResourceGroup,
+    NSGName = tostring(split(Resource, '/')[-3]),
+    SecurityRuleName = tostring(split(Resource, '/')[-1]),
+    Caller,
+    CallerIpAddress,
+    DestPortRange,
+    SourcePrefix
+| extend IPCustomEntity = CallerIpAddress
+| extend AccountCustomEntity = Caller

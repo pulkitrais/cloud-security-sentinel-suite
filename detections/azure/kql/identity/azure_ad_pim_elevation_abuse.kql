@@ -1,0 +1,28 @@
+// Title: Suspicious Azure AD Privileged Role Assignment Outside PIM
+// Description: Detects direct role assignment to Azure AD / Entra ID privileged roles (Global Administrator, Privileged Role Administrator) that bypass standard Privileged Identity Management (PIM) activation flows.
+// Author: Pulkit Rai
+// MITRE ATT&CK: T1078.004 (Valid Accounts: Cloud Accounts), T1098.003 (Account Manipulation: Additional Cloud Roles)
+// Data Sources: AuditLogs (Microsoft Entra ID)
+// Severity: High
+
+AuditLogs
+| where TimeGenerated >= ago(24h)
+| where OperationName in ("Add member to role", "Add member to role in PIM completed (permanent)")
+| extend TargetRole = tostring(TargetResources[0].displayName)
+| extend TargetUserPrincipalName = tostring(TargetResources[0].userPrincipalName)
+| extend InitiatedBy = coalesce(tostring(InitiatedBy.user.userPrincipalName), tostring(InitiatedBy.app.displayName), "Unknown")
+| where TargetRole in ("Global Administrator", "Privileged Role Administrator", "Security Administrator", "Contributor")
+| extend AdditionalDetails = parse_json(tostring(TargetResources[0].modifiedProperties))
+| mv-expand AdditionalDetails
+| where AdditionalDetails.displayName =~ "Role.DisplayName"
+| project 
+    TimeGenerated,
+    OperationName,
+    TargetRole,
+    TargetUserPrincipalName,
+    InitiatedBy,
+    Result,
+    ResultReason,
+    CorrelationId
+| extend AccountCustomEntity = TargetUserPrincipalName
+| extend CallerCustomEntity = InitiatedBy

@@ -1,0 +1,17 @@
+{
+  "rule_id": "AWS-S3-002",
+  "title": "S3 Public Bucket Policy Modification",
+  "description": "Detects modification of Amazon S3 bucket policies that grant anonymous or wildcard Principal read/write permissions.",
+  "severity": "Critical",
+  "mitre_attack": [
+    "T1530",
+    "T1562.001"
+  ],
+  "event_source": "s3.amazonaws.com",
+  "event_name": "PutBucketPolicy",
+  "query": {
+    "filter": "eventSource = 's3.amazonaws.com' AND eventName = 'PutBucketPolicy'",
+    "alert_condition": "requestParameters.bucketPolicy contains '\"Principal\": \"*\"'"
+  },
+  "remediation_action": "revoke_public_bucket_policy"
+}

@@ -1,0 +1,8 @@
+# Cloud Security Sentinel Suite - Core Dependencies
+azure-mgmt-resource>=23.0.0
+azure-mgmt-storage>=21.0.0
+azure-mgmt-network>=25.0.0
+boto3>=1.34.0
+pyyaml>=6.0.1
+flake8>=7.0.0
+pytest>=8.0.0

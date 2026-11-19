@@ -1,0 +1,23 @@
+// Title: Azure VM Run Command Invocation for Remote Code Execution
+// Description: Detects use of Azure VM Run Command API to execute PowerShell or Bash scripts on virtual machines directly through the management plane.
+// Author: Pulkit Rai
+// MITRE ATT&CK: T1059.001 (PowerShell), T1059.004 (Unix Shell), T1021.002 (SMB/Windows Admin Shares)
+// Data Sources: AzureActivity
+// Severity: Medium
+
+AzureActivity
+| where TimeGenerated >= ago(24h)
+| where OperationNameValue has "MICROSOFT.COMPUTE/VIRTUALMACHINES/RUNCOMMAND/ACTION"
+| where ActivityStatusValue =~ "Success" or ActivityStatusValue =~ "Accept"
+| project 
+    TimeGenerated,
+    SubscriptionId,
+    ResourceGroup,
+    VirtualMachineName = tostring(split(Resource, '/')[-1]),
+    Caller = Caller,
+    CallerIpAddress = CallerIpAddress,
+    ActivityStatusValue,
+    CorrelationId
+| extend IPCustomEntity = CallerIpAddress
+| extend AccountCustomEntity = Caller
+| extend HostCustomEntity = VirtualMachineName

@@ -1,0 +1,28 @@
+// Title: Storage Account Public Access Configuration Change
+// Description: Detects modifications to Azure Storage Account settings allowing public blob access or disabling secure transfer requirements.
+// Author: Pulkit Rai
+// MITRE ATT&CK: T1530 (Data from Cloud Storage Object), T1562.001 (Impair Defenses: Disable or Modify Tools)
+// Data Sources: AzureActivity
+// Severity: Medium
+
+AzureActivity
+| where TimeGenerated >= ago(24h)
+| where OperationNameValue =~ "MICROSOFT.STORAGE/STORAGEACCOUNTS/WRITE"
+| where ActivityStatusValue =~ "Success"
+| extend PropertiesBag = parse_json(Properties)
+| extend RequestBody = parse_json(tostring(PropertiesBag.requestbody))
+| extend AllowBlobPublicAccess = tostring(RequestBody.properties.allowBlobPublicAccess)
+| extend SupportsHttpsTrafficOnly = tostring(RequestBody.properties.supportsHttpsTrafficOnly)
+| where AllowBlobPublicAccess =~ "true" or SupportsHttpsTrafficOnly =~ "false"
+| project 
+    TimeGenerated,
+    SubscriptionId,
+    ResourceGroup,
+    Resource = ResourceId,
+    Caller = Caller,
+    CallerIpAddress = CallerIpAddress,
+    AllowBlobPublicAccess,
+    SupportsHttpsTrafficOnly,
+    CorrelationId
+| extend IPCustomEntity = CallerIpAddress
+| extend AccountCustomEntity = Caller
