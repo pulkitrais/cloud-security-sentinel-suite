@@ -1,0 +1,37 @@
+// Title: Microsoft Sentinel TI Feed Correlation with Outbound Network Traffic
+// Description: Correlates Microsoft Sentinel ThreatIntelligenceIndicator threat feed records with outbound firewall and flow logs (CommonSecurityLog and AzureNetworkAnalytics_CL) to detect active command-and-control (C2) beaconing or data exfiltration attempts.
+// Author: Pulkit Rai
+// MITRE ATT&CK: T1071.001 (Web Protocols), T1573 (Encrypted Channel), T1043 (Commonly Used Port)
+// Data Sources: ThreatIntelligenceIndicator, CommonSecurityLog, AzureNetworkAnalytics_CL
+// Severity: High
+
+let dt_lookback = 1d;
+let ioc_lookback = 14d;
+let KnownMaliciousIPs = ThreatIntelligenceIndicator
+| where TimeGenerated >= ago(ioc_lookback)
+| where IsActive == true
+| where isnotempty(NetworkIP) or isnotempty(EmailSourceIpAddress)
+| extend MaliciousIP = coalesce(NetworkIP, EmailSourceIpAddress)
+| summarize LatestIndicatorTime = max(TimeGenerated) by MaliciousIP, Description, ThreatType, ConfidenceScore;
+CommonSecurityLog
+| where TimeGenerated >= ago(dt_lookback)
+| where DeviceAction !in ("Deny", "Block", "Drop")
+| extend DestinationIP = DestinationIP
+| join kind=inner (
+    KnownMaliciousIPs
+) on $left.DestinationIP == $right.MaliciousIP
+| project
+    TimeGenerated,
+    DeviceVendor,
+    DeviceProduct,
+    SourceBroker = SourceIP,
+    DestinationIP,
+    DestinationPort,
+    SentBytes,
+    ReceivedBytes,
+    MaliciousIP,
+    ThreatType,
+    ConfidenceScore,
+    Description
+| extend IPCustomEntity = DestinationIP
+| extend AccountCustomEntity = SourceBroker
