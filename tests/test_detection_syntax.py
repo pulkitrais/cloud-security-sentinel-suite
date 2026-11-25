@@ -11,7 +11,7 @@ class TestDetections(unittest.TestCase):
 
     def test_azure_kql_detection_files(self):
         kql_files = glob.glob(os.path.join(BASE_DIR, "detections", "azure", "kql", "**", "*.kql"), recursive=True)
-        self.assertGreaterEqual(len(kql_files), 6, f"Expected at least 6 KQL detections, found {len(kql_files)}")
+        self.assertGreaterEqual(len(kql_files), 7, f"Expected at least 7 KQL detections, found {len(kql_files)}")
 
         required_headers = ["Title:", "Description:", "Author:", "MITRE ATT&CK:", "Severity:"]
 
@@ -40,7 +40,7 @@ class TestDetections(unittest.TestCase):
 
     def test_sigma_detection_files(self):
         sigma_files = glob.glob(os.path.join(BASE_DIR, "detections", "sigma", "**", "*.yml"), recursive=True)
-        self.assertGreaterEqual(len(sigma_files), 1, f"Expected at least 1 Sigma rule, found {len(sigma_files)}")
+        self.assertGreaterEqual(len(sigma_files), 2, f"Expected at least 2 Sigma rules, found {len(sigma_files)}")
 
         required_keys = ["title", "id", "status", "description", "author", "logsource", "detection", "level"]
         for filepath in sigma_files:

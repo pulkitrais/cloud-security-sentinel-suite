@@ -1,0 +1,28 @@
+title: Azure Cognitive Services and OpenAI Deployment Tampering
+id: d73f2a81-9b4e-4f12-9c10-b74a35d8e902
+status: test
+description: Detects unauthorized or anomalous modifications, deletions, or new deployments within Azure Cognitive Services (including Azure OpenAI models). Threat actors or rogue insiders may delete models to induce denial of service or deploy unauthorized models to bypass AI governance.
+author: Pulkit Rai
+date: 2026-11-25
+references:
+    - https://attack.mitre.org/techniques/T1485/
+    - https://learn.microsoft.com/en-us/azure/ai-services/openai/
+tags:
+    - attack.impact
+    - attack.defense_evasion
+    - attack.t1485
+    - attack.t1098
+logsource:
+    product: azure
+    service: activitylogs
+detection:
+    selection:
+        OperationNameValue|contains:
+            - 'Microsoft.CognitiveServices/accounts/deployments/delete'
+            - 'Microsoft.CognitiveServices/accounts/deployments/write'
+            - 'Microsoft.CognitiveServices/accounts/delete'
+        ActivityStatusValue: 'Success'
+    condition: selection
+falsepositives:
+    - Planned infrastructure-as-code (Terraform / Bicep) deployment or decommissioning of Azure OpenAI instances by DevOps engineers.
+level: high

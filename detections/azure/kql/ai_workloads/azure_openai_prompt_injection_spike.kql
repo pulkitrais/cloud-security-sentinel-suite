@@ -1,0 +1,39 @@
+// Title: Azure OpenAI Prompt Injection and Content Filter Spike
+// Description: Detects anomalous spikes in content filtering violations, jailbreak attempts, or rapid 400 Bad Request error rates on Azure OpenAI / Azure Cognitive Services endpoints. Threat actors fuzz LLM applications with prompt injections and jailbreaks to extract system prompts, bypass guardrails, or execute indirect prompt attacks.
+// Author: Pulkit Rai
+// MITRE ATT&CK: AML.T0051 (LLM Prompt Injection), AML.T0054 (LLM Jailbreak), T1499 (Endpoint Denial of Service)
+// Data Sources: AzureDiagnostics (Cognitive Services / Azure OpenAI)
+// Severity: High
+
+let lookback = 24h;
+let threshold_violations = 10;
+AzureDiagnostics
+| where TimeGenerated >= ago(lookback)
+| where ResourceProvider =~ "MICROSOFT.COGNITIVESERVICES"
+| where Category in~ ("RequestResponse", "Audit", "CognitiveServicesAuditLogs")
+| extend ResultCode = tostring(coalesce(ResultSignature_d, ResultSignature_s, httpStatusCode_d))
+| extend PropertiesJson = parse_json(properties_s)
+| extend FilterReason = tostring(coalesce(PropertiesJson.filter_reason, PropertiesJson.code, PropertiesJson.error.code))
+| extend ModelDeployment = tostring(coalesce(PropertiesJson.deployment_id, PropertiesJson.model))
+| where ResultCode in ("400", "429") or FilterReason in~ ("ResponsibleAIPolicyViolated", "PromptShieldBlocked", "JailbreakDetected", "ContentFilter")
+| summarize
+    ViolationCount = count(),
+    DistinctModels = dcount(ModelDeployment),
+    DistinctEndpoints = dcount(Resource),
+    FirstSeen = min(TimeGenerated),
+    LastSeen = max(TimeGenerated)
+    by CallerIPAddress, Resource, SubscriptionId, ModelDeployment
+| where ViolationCount >= threshold_violations
+| extend AccountCustomEntity = CallerIPAddress
+| extend IPCustomEntity = CallerIPAddress
+| project
+    FirstSeen,
+    LastSeen,
+    CallerIPAddress,
+    Resource,
+    SubscriptionId,
+    ModelDeployment,
+    ViolationCount,
+    DistinctModels,
+    DistinctEndpoints
+| order by ViolationCount desc
