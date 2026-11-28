@@ -1,0 +1,45 @@
+// Title: Azure RBAC Custom Role Privilege Escalation and Wildcard Assignment
+// Description: Detects the creation, update, or assignment of Azure RBAC Custom Role definitions granting dangerous administrative actions (such as '*', 'Microsoft.Authorization/*', 'Microsoft.Resources/deployments/*') or assigning privileged roles at root or subscription scope. Adversaries abuse custom roles or role assignments to establish covert persistence and achieve tenant-wide privilege escalation.
+// Author: Pulkit Rai
+// MITRE ATT&CK: T1098.001 (Account Manipulation: Additional Cloud Roles), T1548.005 (Abuse Elevation Control Mechanism: Temporary Elevated Cloud Access)
+// Data Sources: AzureActivity (Administrative)
+// Severity: High
+
+let lookback = 24h;
+let high_risk_actions = dynamic([
+    "Microsoft.Authorization/roleDefinitions/write",
+    "Microsoft.Authorization/roleAssignments/write",
+    "Microsoft.Authorization/elevateAccess/action"
+]);
+AzureActivity
+| where TimeGenerated >= ago(lookback)
+| where OperationNameValue in~ (high_risk_actions)
+| where ActivityStatusValue in~ ("Success", "Succeeded", "Accepted")
+| extend Caller = coalesce(Caller, Claims_d.name, Claims_d.upn, "Unknown")
+| extend CallerIP = CallerIpAddress
+| extend ResourceGroup = ResourceGroup
+| extend SubscriptionId = SubscriptionId
+| extend Scope = tostring(Properties_d.entity)
+| extend RoleDefinitionProperties = parse_json(tostring(Properties_d.requestbody))
+| extend CustomRoleActions = RoleDefinitionProperties.properties.permissions[0].actions
+| extend CustomRoleAssignableScopes = RoleDefinitionProperties.properties.assignableScopes
+| extend RoleName = tostring(coalesce(RoleDefinitionProperties.properties.roleName, Properties_d.roleDefinitionName))
+| extend RoleDefinitionId = tostring(Properties_d.roleDefinitionId)
+| extend PrincipalId = tostring(Properties_d.principalId)
+| extend IsWildcardPermitted = iff(CustomRoleActions has "*" or CustomRoleActions has "Microsoft.Authorization/*", true, false)
+| project
+    TimeGenerated,
+    OperationNameValue,
+    Caller,
+    CallerIP,
+    RoleName,
+    RoleDefinitionId,
+    PrincipalId,
+    Scope,
+    IsWildcardPermitted,
+    CustomRoleActions,
+    SubscriptionId,
+    ResourceGroup,
+    CorrelationId
+| extend AccountCustomEntity = Caller
+| extend IPCustomEntity = CallerIP

@@ -1,0 +1,33 @@
+title: Azure RBAC Custom Role Privilege Escalation
+id: c7429d81-8314-4a27-991f-0158d693bf12
+status: test
+description: Detects the creation or update of Azure Role-Based Access Control (RBAC) custom role definitions or unauthorized high-privilege role assignments via Azure Activity logs, indicating potential cloud privilege escalation.
+author: Pulkit Rai
+date: 2026-11-28
+references:
+    - https://attack.mitre.org/techniques/T1548/005/
+    - https://attack.mitre.org/techniques/T1098/001/
+    - https://learn.microsoft.com/en-us/azure/role-based-access-control/custom-roles
+tags:
+    - attack.privilege_escalation
+    - attack.persistence
+    - attack.t1548.005
+    - attack.t1098.001
+logsource:
+    product: azure
+    service: activitylogs
+detection:
+    selection:
+        operationName:
+            - 'Microsoft.Authorization/roleDefinitions/write'
+            - 'Microsoft.Authorization/roleAssignments/write'
+            - 'Microsoft.Authorization/elevateAccess/action'
+        status:
+            - 'Success'
+            - 'Succeeded'
+            - 'Accepted'
+    condition: selection
+falsepositives:
+    - Legitimate infrastructure-as-code deployments (Terraform, Bicep, ARM) managed by authorized platform engineering CI/CD pipelines.
+    - Authorized tenant administrator configuring custom security audit roles.
+level: high
